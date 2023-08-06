@@ -1,0 +1,44 @@
+.mollegrid {
+  position: relative;
+}
+
+.molle {
+  display: flex;
+  flex-direction: column;
+}
+
+.attachmentsoverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.row {
+  display: flex;
+  margin-bottom: 1in;
+}
+
+.cell {
+  background-color: rgba($color: #000000, $alpha: 0.25);
+  border-inline: 1.5px solid rgba($color: #000000, $alpha: 0.15);
+  width: 1.5in;
+  height: 1in;
+  cursor: pointer;
+
+  &:hover {
+    background-color: rgba($color: #2256f2, $alpha: 0.5);
+    border-inline: 1.5px solid rgba($color: #2256f2, $alpha: 0.15);
+  }
+}
+
+.filled {
+  opacity: 0.5;
+}
+
+.attachment {
+  background-color: rgba($color: #000000, $alpha: 0.5);
+  outline: 1px solid red;
+  position: fixed;
+}
