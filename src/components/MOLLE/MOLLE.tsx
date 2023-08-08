@@ -12,14 +12,12 @@ interface Attachment {
   endCoord: { x: number; y: number };
 }
 
+type MOLLETypes = "standard" | "laser_cut";
+
 function MOLLEGrid({ rows, columns }: IMOLLEGridProps) {
-  const [attachments, setAttachments] = useState<Attachment[]>([
-    {
-      id: "test",
-      startCoord: { x: 0, y: 0 },
-      endCoord: { x: 1, y: 1 },
-    },
-  ]);
+  const [molleType, setMOLLEType] = useState<MOLLETypes>("standard");
+
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const [filledMatrix, setFilledMatrix] = useState<boolean[][]>([]);
 
@@ -150,100 +148,93 @@ function MOLLEGrid({ rows, columns }: IMOLLEGridProps) {
     return grid;
   }
 
-  const getAttachment = useCallback(
-    (id: string) => {
-      if (attachments) {
-        for (const attachment of attachments) {
-          if (attachment.id === id) {
-            return attachment;
-          }
-        }
-      }
-    },
-    [attachments]
-  );
+  const gridCoordsToElementCoords = useCallback(
+    ({ x, y }: { x: number; y: number }) => {
+      const cell = document.getElementById(`cell-${y}-${x}`);
 
-  const getAttachmentBoundingBox = useCallback(
-    (id: string) => {
-      const attachment = getAttachment(id);
-      if (!attachment) {
-        console.error("Attachment with id", id, "not found");
-        return undefined;
-      }
-      const { startCoord, endCoord } = attachment;
-
-      const startCell = document.getElementById(
-        `cell-${startCoord.x}-${startCoord.y}`
-      );
-      const endCell = document.getElementById(
-        `cell-${endCoord.x}-${endCoord.y}`
-      );
-
-      if (!startCell || !endCell) {
-        console.error("One or more cells not found for attachment", attachment);
-        return undefined;
+      if (!cell) {
+        return null;
       }
 
-      const startCellRect = startCell.getBoundingClientRect();
-      const endCellRect = endCell.getBoundingClientRect();
-
-      console.log(
-        "Rects: ",
-        startCell.innerHTML,
-        startCellRect,
-        endCell.innerHTML,
-        endCellRect
-      );
+      const { x: elX, y: elY } = cell.getBoundingClientRect();
 
       return {
-        top: startCellRect.top,
-        left: startCellRect.left,
-        right: endCellRect.right,
-        bottom: endCellRect.bottom,
+        left: elX,
+        top: elY,
       };
     },
-    [getAttachment]
+    []
   );
 
+  const computeAttachmentDimensions = useCallback((attachment: Attachment) => {
+    const { startCoord, endCoord } = attachment;
+
+    const width = endCoord.x - startCoord.x + 1;
+    const height = endCoord.y - startCoord.y + 1;
+    return {
+      width,
+      height,
+    };
+  }, []);
+
   /**
-    DOMRect { x: 387.5, y: 74, width: 147, height: 96, top: 74, right: 534.5, bottom: 170, left: 387.5 }
-    DOMRect { x: 534.5, y: 266, width: 147, height: 96, top: 266, right: 681.5, bottom: 362, left: 534.5 }
+    DOMRect { x: 360, y: 74, width: 147, height: 96, top: 74, right: 507, bottom: 170, left: 360 }
+    DOMRect { x: 507, y: 266, width: 147, height: 96, top: 266, right: 654, bottom: 362, left: 507 }
    */
+
+  const getMOLLETypeRowsFromHeight = useCallback(
+    (height: number) => {
+      if (molleType === "standard") {
+        return height * 2 - 1;
+      }
+      return height;
+    },
+    [molleType]
+  );
 
   const displayAttachments = useCallback(() => {
     const attachmentElements: JSX.Element[] = [];
-    if (attachments) {
-      for (const attachment of attachments) {
-        const boundingBox = getAttachmentBoundingBox(attachment.id);
-        if (!boundingBox) {
-          continue;
-        }
-        const { top, left, bottom, right } = boundingBox;
-        attachmentElements.push(
-          <div
-            className={styles.attachment}
-            key={`attachment-${attachment.id}`}
-            style={{
-              top: top,
-              left: left,
-              bottom: bottom,
-              right: right,
-            }}
-          >
-            {attachment.id}
-          </div>
-        );
-      }
-    }
-    return attachmentElements;
-  }, [attachments, getAttachmentBoundingBox]);
+    attachments.forEach((att) => {
+      const dimensions = computeAttachmentDimensions(att);
+      const startingPosition = gridCoordsToElementCoords({
+        x: att.startCoord.x,
+        y: att.startCoord.y,
+      });
 
-  document.body.appendChild(
-    document.createElement("div").classList.add("test")
-  );
+      if (!startingPosition) {
+        return;
+      }
+
+      const leftFluff = 3;
+      const topFluff = 1;
+
+      const attachmentEl = (
+        <div
+          key={att.id + att.startCoord.y + att.startCoord.x}
+          className={`${styles.attachment}`}
+          id={att.id}
+          style={{
+            left: startingPosition.left + leftFluff,
+            top: startingPosition.top + topFluff,
+            width: `${dimensions.width * 1.5}in`,
+            height: `${getMOLLETypeRowsFromHeight(dimensions.height)}in`,
+          }}
+        >
+          {att.id}
+        </div>
+      );
+      attachmentElements.push(attachmentEl);
+    });
+    return attachmentElements;
+  }, [
+    attachments,
+    computeAttachmentDimensions,
+    getMOLLETypeRowsFromHeight,
+    gridCoordsToElementCoords,
+  ]);
 
   return (
-    <div className={styles.mollegrid}>
+    <div className={styles.mollegrid} id="mollegrid">
       <div className={styles.molle}>{buildGrid()}</div>
       <div className={styles.attachmentsoverlay}>{displayAttachments()}</div>
     </div>
