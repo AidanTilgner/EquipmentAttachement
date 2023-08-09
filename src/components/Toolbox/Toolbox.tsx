@@ -10,6 +10,10 @@ const equipment = [
     name: "test2",
     dimensions: { height: 2, width: 1 },
   },
+  {
+    name: "test3",
+    dimensions: { height: 1, width: 2 },
+  },
 ];
 
 function Toolbox() {
