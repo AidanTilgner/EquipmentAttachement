@@ -16,7 +16,7 @@ interface Attachment {
 type MOLLETypes = "standard" | "laser_cut";
 
 function MOLLEGrid({ rows, columns }: IMOLLEGridProps) {
-  const [molleType, setMOLLEType] = useState<MOLLETypes>("standard");
+  const [molleType] = useState<MOLLETypes>("standard");
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
