@@ -10,6 +10,7 @@ interface Attachment {
   id: string;
   startCoord: { x: number; y: number };
   endCoord: { x: number; y: number };
+  dimensions: { height: number; width: number };
 }
 
 type MOLLETypes = "standard" | "laser_cut";
@@ -24,7 +25,7 @@ function MOLLEGrid({ rows, columns }: IMOLLEGridProps) {
   const cellIsFilled = useCallback(
     (x: number, y: number) => {
       if (filledMatrix.length > 0) {
-        return filledMatrix[x][y];
+        return filledMatrix[y][x];
       }
       return false;
     },
@@ -105,48 +106,23 @@ function MOLLEGrid({ rows, columns }: IMOLLEGridProps) {
           }
         }
       }
+      return true;
     },
     [attachments, columns, rows]
   );
 
   const addAttachment = useCallback(
     (attachment: Attachment) => {
+      console.log("Attempting to add attachment", attachment);
       const allowed = checkAttachmentAllowed(attachment);
       if (!allowed) {
+        window.alert("You can't put an attachment there!");
         return;
       }
       setAttachments([...attachments, attachment]);
     },
     [attachments, checkAttachmentAllowed]
   );
-
-  function buildGrid() {
-    const grid: JSX.Element[] = [];
-
-    for (let i = 0; i < rows; i++) {
-      const row: JSX.Element[] = [];
-
-      for (let j = 0; j < columns; j++) {
-        row.push(
-          <div
-            className={`${styles.cell} ${
-              cellIsFilled(i, j) ? styles.filled : styles.unfilled
-            }`}
-            key={`cell-${i}-${j}`}
-            id={`cell-${i}-${j}`}
-          >{`${i}-${j}`}</div>
-        );
-      }
-
-      grid.push(
-        <div className={styles.row} key={`row-${i}`}>
-          {row}
-        </div>
-      );
-    }
-
-    return grid;
-  }
 
   const gridCoordsToElementCoords = useCallback(
     ({ x, y }: { x: number; y: number }) => {
@@ -156,31 +132,15 @@ function MOLLEGrid({ rows, columns }: IMOLLEGridProps) {
         return null;
       }
 
-      const { x: elX, y: elY } = cell.getBoundingClientRect();
+      const { left, top } = cell.getBoundingClientRect();
 
       return {
-        left: elX,
-        top: elY,
+        left,
+        top,
       };
     },
     []
   );
-
-  const computeAttachmentDimensions = useCallback((attachment: Attachment) => {
-    const { startCoord, endCoord } = attachment;
-
-    const width = endCoord.x - startCoord.x + 1;
-    const height = endCoord.y - startCoord.y + 1;
-    return {
-      width,
-      height,
-    };
-  }, []);
-
-  /**
-    DOMRect { x: 360, y: 74, width: 147, height: 96, top: 74, right: 507, bottom: 170, left: 360 }
-    DOMRect { x: 507, y: 266, width: 147, height: 96, top: 266, right: 654, bottom: 362, left: 507 }
-   */
 
   const getMOLLETypeRowsFromHeight = useCallback(
     (height: number) => {
@@ -195,7 +155,7 @@ function MOLLEGrid({ rows, columns }: IMOLLEGridProps) {
   const displayAttachments = useCallback(() => {
     const attachmentElements: JSX.Element[] = [];
     attachments.forEach((att) => {
-      const dimensions = computeAttachmentDimensions(att);
+      const dimensions = att.dimensions;
       const startingPosition = gridCoordsToElementCoords({
         x: att.startCoord.x,
         y: att.startCoord.y,
@@ -226,17 +186,88 @@ function MOLLEGrid({ rows, columns }: IMOLLEGridProps) {
       attachmentElements.push(attachmentEl);
     });
     return attachmentElements;
-  }, [
-    attachments,
-    computeAttachmentDimensions,
-    getMOLLETypeRowsFromHeight,
-    gridCoordsToElementCoords,
-  ]);
+  }, [attachments, getMOLLETypeRowsFromHeight, gridCoordsToElementCoords]);
+  const [dragDetected, setDragDetected] = useState(false);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.currentTarget.classList.remove(styles.dragover);
+      setDragDetected(false);
+      const name = e.dataTransfer.getData("name");
+      const dimensions = JSON.parse(e.dataTransfer.getData("dimensions"));
+      const cell = e.target as HTMLDivElement;
+      if (!cell) {
+        return;
+      }
+      const cellCoords = cell.dataset.coords?.split("-");
+      if (!cellCoords) {
+        return;
+      }
+      const cellX = parseInt(cellCoords[1]);
+      const cellY = parseInt(cellCoords[0]);
+      const attachment: Attachment = {
+        id: name,
+        dimensions,
+        startCoord: { x: cellX, y: cellY },
+        endCoord: {
+          x: cellX + dimensions.width - 1,
+          y: cellY + dimensions.height - 1,
+        },
+      };
+      addAttachment(attachment);
+    },
+    [addAttachment]
+  );
+
+  function buildGrid() {
+    const grid: JSX.Element[] = [];
+
+    for (let i = 0; i < rows; i++) {
+      const row: JSX.Element[] = [];
+
+      for (let j = 0; j < columns; j++) {
+        row.push(
+          <div
+            className={`${styles.cell} ${
+              cellIsFilled(i, j) ? styles.filled : styles.unfilled
+            }`}
+            key={`cell-${i}-${j}`}
+            id={`cell-${i}-${j}`}
+            data-coords={`${i}-${j}`}
+            onDrop={handleDrop}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.currentTarget.classList.add(styles.dragover);
+            }}
+            onDragLeave={(e) => {
+              e.currentTarget.classList.remove(styles.dragover);
+            }}
+          >{`${i}-${j}`}</div>
+        );
+      }
+
+      grid.push(
+        <div className={styles.row} key={`row-${i}`}>
+          {row}
+        </div>
+      );
+    }
+
+    return grid;
+  }
 
   return (
     <div className={styles.mollegrid} id="mollegrid">
       <div className={styles.molle}>{buildGrid()}</div>
-      <div className={styles.attachmentsoverlay}>{displayAttachments()}</div>
+      {!dragDetected && (
+        <div
+          className={styles.attachmentsoverlay}
+          onDragOver={() => setDragDetected(true)}
+        >
+          {displayAttachments()}
+        </div>
+      )}
     </div>
   );
 }
